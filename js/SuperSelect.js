@@ -270,8 +270,10 @@
 
 		main.addEventListener('click',function(e){
 			e.stopPropagation();
-			that.select(+e.target.dataset.index);
-			if(!multiple){ that.open = false; }
+			if(e.target.dataset.hasOwnProperty("index")){
+				that.select(+e.target.dataset.index);
+				if(!multiple){ that.open = false; }
+			}
 		},false);
 
 
@@ -430,46 +432,14 @@
 
 	if(window.Ractive){
 		Ractive.components.SuperSelect = Ractive.extend({
-			template: `
-				<button on-click='@this.toggle("open")'>toggle open</button>
-				<div class='{{open ? "open" : "closed"}}' on-click='@this.select(event.original)'>
-					<!-- instead of using data binding, we'll render this manually -->
-				</div>`,
-			data: { open: true },
-			onrender () {
-				const div = this.find( 'div' );
-				this.observe( 'items', items => {
-					div.innerHTML = '<ul>' + items.map( (x,i) => `<li data-index='${i}'>${x.label}</li>` ).join( '\n' ) + '</ul>';
-				});
-			},
-			select ( e ) {
-				const index = e.target.getAttribute( 'data-index' );
-				if ( index ) {
-					this.fire( 'select', this.get( 'items' )[ index ] );
-				}
+			template: "<span></span>",
+			onrender(){
+				var ss = new SuperSelect({target: this.find('span')});
+				this.observe('options',function(opts){ ss.options = opts; });
+				this.observe('defaultOpt',function(dopt){ ss.defaultOpt = dopt; });
+				this.observe('multiple',function(m){ ss.multiple = m; });
+				this.observe('value',function(v){ ss.value = v; });
 			}
 		});
-
-		/*
-		var ractive = new Ractive({
-		  el: 'main',
-		  template: `
-			<button on-click='@this.changeItems()'>change items</button>
-			<SuperSelect items='{{items}}' on-select='@this.set("selected",$1)'/>
-			<p>selected: {{selected ? selected.label : 'nothing'}}</p>`,
-		  oninit () {
-			this.changeItems();
-		  },
-		  changeItems () {
-			var i = ~~( 3 + Math.random() * 10 );
-			var items = Array( i );
-			while ( i-- ) {
-			  items.push({ label: String.fromCharCode( ~~( 65 + Math.random() * 26 ) ) });
-			}
-			this.set( 'items', items );
-		  },
-		  components: { SuperSelect }
-		});
-		*/
 	}
 }());
