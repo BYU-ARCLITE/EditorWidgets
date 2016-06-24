@@ -2,23 +2,28 @@
 	if(typeof window.EditorWidgets !== 'object'){
 		window.EditorWidgets = {};
 	}
-	/* text, btnpos, icon, multiple, target, options, value, name, id, modal */
+
+	/*	text, btnpos, icon, multiple, target,
+		options, value, name, id, modal,
+		defaultOpt
+	*/
 	function SuperSelect(args){
 		var that = this, open = false,
-			leftbtn, rightbtn, btnpos,
+			leftbtn, rightbtn, btnpos, defOpt,
 			parent, refnode, select, multiple,
 			options, tmpopts, value, modal,
 			main = document.createElement('div'),
 			rightbtn = document.createElement('button'),
 			controls = document.createElement('div'),
 			badgeHolder = document.createElement('span'),
+			defBadge = document.createElement('span'),
 			noSelection = document.createElement('span'),
 			popup = document.createElement('div'),
 			point = document.createElement('div'),
 			filterbox = document.createElement('input'),
 			filterdiv = document.createElement('div'),
 			optionList = document.createElement('div');
-		
+
 		Object.defineProperties(this,{
 			name: {
 				get: function(){ return select.name; },
@@ -39,6 +44,25 @@
 							if(o.value !== value[0]){ that.deselect(i); }
 						});
 					}
+				}
+			},
+			defaultOpt: {
+				get: function(){ return defOpt; },
+				set: function(newdef){
+					defOpt = typeof newdef === "object"?newdef:null;
+					defBadge.textContent = defOpt.text;
+					if(defOpt){
+						noSelection.style.display = "none";
+						if(value.length === 0){
+							defBadge.style.display = "inline";
+						}
+					}else{
+						defBadge.style.display = "none";
+						if(value.length === 0){
+							noSelection.style.display = "inline";
+						}
+					}
+					return defOpt;
 				}
 			},
 			open: {
@@ -78,10 +102,12 @@
 				value: function(i){
 					var o = options[i];
 					if(!o || o.selected){ return; }
+
 					o.selected = true;
 					o.opt.selected = true;
 					o.badge.display = "inline";
 					o.listing.classList.add("selected");
+
 					if(!multiple){
 						options.forEach(function(opt){
 							if(opt !== o && opt.selected){
@@ -92,6 +118,7 @@
 							}
 						});
 					}
+
 					updateValue();
 				}
 			},
@@ -132,9 +159,9 @@
 							listing = constructlisting(o.text,o.desc,i),
 							opt = document.createElement('option'),
 							selected = max > 1 && o.selected !== false && (o.selected || value.indexOf(o.value) > -1);
-						
+
 						opt.value = o.value;
-						
+
 						if(selected){
 							opt.selected = true;
 							badge.display = "inline;";
@@ -169,10 +196,11 @@
 						optionList.appendChild(o.listing);
 					});
 				}
-			}
+			},
 			value: {
 				get: function(){
-					return value.slice();
+					return	value.length > 0?value.slice():
+							defOpt?[defOpt.value]:[];
 				},
 				set: function(val){
 					if(!(val instanceof Array)){ val = [val]; }
@@ -194,9 +222,7 @@
 					});
 
 					updateValue();
-
 				}
-				
 			}
 		});
 
@@ -220,7 +246,7 @@
 		select.multiple = true;
 
 		controls.className = "superselect";
-		
+
 		leftbtn = constructButton(args.text, args.icon, this);
 		rightbtn = constructButton(args.text, args.icon, this);
 
@@ -228,10 +254,16 @@
 
 		controls.appendChild(leftbtn);
 
+		defBadge.className = "badge badge-info pad-right-low";
 		noSelection.textContent = "Nothing selected";
+
+		badgeHolder.appendChild(defBadge);
 		badgeHolder.appendChild(noSelection);
+
+		this.defaultOpt = args.defaultOpt;
+
 		controls.appendChild(badgeHolder);
-	
+
 		controls.appendChild(rightbtn);
 
 		main.appendChild(controls)
@@ -242,7 +274,7 @@
 			if(!multiple){ that.open = false; }
 		},false);
 
-		
+
 		popup.className = "superselectPopup";
 		popup.classList.add(btnpos);
 		popup.style.display = "none";
@@ -258,7 +290,7 @@
 
 		filterdiv.appendChild(filterbox);
 		popup.appendChild(filterdiv);
-		
+
 		optionList.className = "optionListing";
 		popup.appendChild(optionList);
 
@@ -272,7 +304,7 @@
 					selected: opt.selected
 				};
 			});
-		
+
 		this.options = tmpopts;
 		this.value = args.value;
 
@@ -284,7 +316,7 @@
 		}else if(args.modal instanceof Node){
 			modal = args.modal;
 		}
-		
+
 		// Modals don't allow selection of input elements outside of modal
 		(modal||document.body).appendChild(popup);
 
@@ -302,8 +334,9 @@
 						.map(function(o){ return o.value; });
 
 			if(value.length === 0){
-				noSelection.style.display = "inline";
+				(defOpt?defBadge:noSelection).style.display = "inline";
 			}else{
+				defBadge.style.display = "none";
 				noSelection.style.display = "none";
 			}
 		}
@@ -351,14 +384,14 @@
 	function constructBadge(text,i){
 		var badge = document.createElement('span'),
 			x = document.createElement('span');
-		
+
 		badge.className = "badge badge-info pad-right-low";
-	
+
 		x.style.color = "white";
 		x.style.cursor = "pointer";
-	
+
 		x.dataset.index = i;
-	
+
 		badge.appendChild(document.createTextNode(text));
 		badge.appendChild(x);
 		return badge;
@@ -371,78 +404,29 @@
 			check = document.createElement('div');
 
 		main.style.clear = "both";
-		
+
 		tcon.style.textAlign = "left";
 		tcon.style.pointerEvents = "none";
-		
+
 		dcon.style.float = "right";
 		dcon.style.pointerEvents = "none";
-		
+
 		check.className = "check";
-		
+
 		tcon.appendChild(check);
 		tcon.appendChild(document.createTextNode(text));
-		
+
 		dcon.appendChild(document.createTextNode(desc));
 
 		main.appendChild(tcon);
 		main.appendChild(dcon);
 
 		main.dataset.index = i;
-		
+
 		return main;
 	}
 
-	/*
-		onrender: function(options){
-			var r = this,
-				defval = this.get("defaultValue"),
-				defaultExists = !!defval,
-
-
-			this.set('showDefault', (defaultExists && !(this.get("selection").length)));
-			if (this.get('showDefault')){
-				this.set('selection',[defval.value]);
-			} else if (defaultExists){
-				if (~this.get("selection").indexOf(defval.value))
-					this.set('showDefault', true);
-			}
-
-			this.on('select',function(e,which){
-				var sels = this.get("selection"),
-					selopt = select.options[which],
-					optval = this.get("options")[which].value;
-				if(this.get("multiple")){
-					if(selopt.selected){
-						sels.splice(sels.indexOf(optval),1);
-						if (defaultExists && sels.length === 0) {
-							sels.push(defval.value);
-							this.set('showDefault', true);
-						}
-					}else{
-						sels.push(optval);
-						if (defaultExists && sels[0] === defval.value) {
-							sels.splice(0,1);
-							this.set('showDefault', false);
-						}
-					}
-				} else {
-					select.value = optval;
-					if(sels[0] === optval){
-						if(!defaultExists){ return; }
-						this.set('selection', [defval.value]);
-						this.set('showDefault', true);
-					} else {
-						this.set('selection', [optval]);
-						this.set('showDefault', false);
-					}
-					this.set('open', false);
-				}
-				resizeEvt();
-			});
-		}
-	});
-	*/
+	EditorWidgets.SuperSelect = SuperSelect;
 
 	if(window.Ractive){
 		Ractive.components.SuperSelect = Ractive.extend({
