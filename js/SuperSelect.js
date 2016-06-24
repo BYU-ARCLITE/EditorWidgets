@@ -2,12 +2,12 @@
 	if(typeof window.EditorWidgets !== 'object'){
 		window.EditorWidgets = {};
 	}
-	/* text, btnpos, icon, multiple, target, options, value, name, id */
+	/* text, btnpos, icon, multiple, target, options, value, name, id, modal */
 	function SuperSelect(args){
 		var that = this, open = false,
 			leftbtn, rightbtn, btnpos,
 			parent, refnode, select, multiple,
-			options, tmpopts, value,
+			options, tmpopts, value, modal,
 			main = document.createElement('div'),
 			rightbtn = document.createElement('button'),
 			controls = document.createElement('div'),
@@ -19,68 +19,6 @@
 			filterdiv = document.createElement('div'),
 			optionList = document.createElement('div');
 		
-		main.style.display = "inline-block";
-		main.style.position = "relative";
-
-		if(args.target.nodeName === "SELECT"){
-			select = args.target;
-			parent = select.parentNode;
-			refnode = select.nextSibling;
-			multiple = select.multiple;
-		}else{
-			parent = args.target;
-			refnode = null;
-			multiple = !!args.multiple;
-		}
-
-		main.appendChild(select);
-
-		select.style.display = "none";
-		select.multiple = true;
-
-		controls.className = "superselect";
-		
-		leftbtn = constructButton(args.text, args.icon, this);
-		rightbtn = constructButton(args.text, args.icon, this);
-		
-		controls.appendChild(leftbtn);
-
-		noSelection.textContent = "Nothing selected";
-		badgeHolder.appendChild(noSelection);
-		controls.appendChild(badgeHolder);
-	
-		controls.appendChild(rightbtn);
-
-		main.appendChild(controls)
-
-		popup.className = "superselectPopup";
-		popup.classList.add(btnpos);
-		popup.style.display = "none";
-
-		point.className = "point";
-		popup.appendChild(point);
-		popup.appendChild(point.cloneNode());
-
-		filterbox.className = "search-query";
-		filterbox.type = "text";
-
-		filterbox.addEventListener('change',filterOptions,false);
-
-		filterdiv.appendChild(filterbox);
-		popup.appendChild(filterdiv);
-		
-		optionList.className = "optionListing";
-		popup.appendChild(optionList);
-
-		main.appendChild(popup);
-
-		main.addEventListener('click',function(e){
-			e.stopPropagation();
-			if(!e.target.dataset.hasOwnProperty('index')){ return; }
-			var i = +e.target.dataset.index;
-			
-		},false);
-
 		Object.defineProperties(this,{
 			name: {
 				get: function(){ return select.name; },
@@ -106,8 +44,16 @@
 			open: {
 				get: function(){ return open; },
 				set: function(b){
-					open = !!b;
+					b = !!b;
+					if(open === b){ return; }
+					open = b;
 					popup.style.display = open?"block":"none";
+
+					if(open){
+						resize();
+						filterbox.focus();
+					}
+
 					return open;
 				}
 			},
@@ -254,7 +200,67 @@
 			}
 		});
 
+		main.style.display = "inline-block";
+		main.style.position = "relative";
+
+		if(args.target.nodeName === "SELECT"){
+			select = args.target;
+			parent = select.parentNode;
+			refnode = select.nextSibling;
+			multiple = select.multiple;
+		}else{
+			parent = args.target;
+			refnode = null;
+			multiple = !!args.multiple;
+		}
+
+		main.appendChild(select);
+
+		select.style.display = "none";
+		select.multiple = true;
+
+		controls.className = "superselect";
+		
+		leftbtn = constructButton(args.text, args.icon, this);
+		rightbtn = constructButton(args.text, args.icon, this);
+
 		this.btnpos = args.btnpos;
+
+		controls.appendChild(leftbtn);
+
+		noSelection.textContent = "Nothing selected";
+		badgeHolder.appendChild(noSelection);
+		controls.appendChild(badgeHolder);
+	
+		controls.appendChild(rightbtn);
+
+		main.appendChild(controls)
+
+		main.addEventListener('click',function(e){
+			e.stopPropagation();
+			that.select(+e.target.dataset.index);
+			if(!multiple){ that.open = false; }
+		},false);
+
+		
+		popup.className = "superselectPopup";
+		popup.classList.add(btnpos);
+		popup.style.display = "none";
+
+		point.className = "point";
+		popup.appendChild(point);
+		popup.appendChild(point.cloneNode());
+
+		filterbox.className = "search-query";
+		filterbox.type = "text";
+
+		filterbox.addEventListener('change',filterOptions,false);
+
+		filterdiv.appendChild(filterbox);
+		popup.appendChild(filterdiv);
+		
+		optionList.className = "optionListing";
+		popup.appendChild(optionList);
 
 		tmpopts = (args.options instanceof Array)?
 			args.options:
@@ -266,14 +272,29 @@
 					selected: opt.selected
 				};
 			});
-
+		
 		this.options = tmpopts;
 		this.value = args.value;
 
 		if(typeof args.id === "string"){ this.id = args.id; }
 		if(typeof args.name === "string"){ this.name = args.name; }
 
+		if(typeof args.modal === "string"){
+			modal = document.getElementById(args.modal);
+		}else if(args.modal instanceof Node){
+			modal = args.modal;
+		}
+		
+		// Modals don't allow selection of input elements outside of modal
+		(modal||document.body).appendChild(popup);
+
 		parent.insertBefore(main, refnode);
+
+		window.addEventListener("resize", function(){ if(open) resize(); }, false);
+		window.addEventListener("click", function(){ that.open = false; }, false);
+		document.addEventListener("keyup", function(e){
+			if(e.keyCode === 27){ that.open = false; }
+		},false);
 
 		function updateValue(){
 			value = options
@@ -296,6 +317,15 @@
 				)?"":"none";
 			});
 		}
+
+		function resize(){
+			var bodyRect = document.body.getBoundingClientRect(),
+				elemRect = (btnpos === "left"?leftbtn:rightbtn).getBoundingClientRect(),
+				offsetTop = (elemRect.top + 45) - bodyRect.top,
+				offsetLeft = elemRect.left - bodyRect.left;
+			popup.style.top = offsetTop + "px";
+			popup.style.left = offsetLeft + "px";
+		}
 	}
 
 	function constructButton(text, iconclass, ss){
@@ -303,6 +333,7 @@
 			btn = document.createElement('button'),
 			icon = document.createElement('div');
 
+		btn.className = "btn";
 		icon.className = iconclass;
 		btn.appendChild(icon);
 		btn.appendChild(document.createTextNode(text));
@@ -310,6 +341,7 @@
 
 		btn.addEventListener('click',function(e){
 			e.stopPropagation();
+			e.preventDefault();
 			ss.open = !ss.open;
 		},false);
 
@@ -362,58 +394,12 @@
 	}
 
 	/*
-		data: {
-			filterstr: "",
-			filter: function(str,text,desc){
-				return	text.toLowerCase().indexOf(str.toLowerCase()) > -1 ||
-						desc.toLowerCase().indexOf(str.toLowerCase()) > -1 ;
-			},
-			checkSelected: function(optval,selval){
-				return ~selval.indexOf(optval);
-			},
-			showDefault: false
-		},
 		onrender: function(options){
 			var r = this,
-				popup = this.find('.superselectPopup'),
-				superSel = this.find('.superselect .btn'),
-				select = this.find('select'),
 				defval = this.get("defaultValue"),
 				defaultExists = !!defval,
-				modalId = this.get("modalId"),
-				resizeEvt;
 
-			// Allow the popup to pop out of whatever element it is in to reduce cliping
-			popup.parentNode.removeChild(popup);
 
-			// Check to see if the modal exists
-			// Do this because some ractive elements are created without being used,
-			// so the modals don't actually exist. So its just safer to check if the
-			// modal exists first.
-			if (!document.querySelectorAll("#" + modalId).length) { modalId = false; }
-
-			if (modalId){
-				// Modals don't allow selection of input elements outside of modal
-				document.getElementById(modalId).appendChild(popup);
-				resizeEvt = function(){
-					var bodyRect = document.getElementById(modalId).getBoundingClientRect(),
-						elemRect = superSel.getBoundingClientRect(),
-						offsetTop = (elemRect.top + 45) - bodyRect.top,
-						offsetLeft = elemRect.left - bodyRect.left;
-					popup.style.top = offsetTop + "px";
-					popup.style.left = offsetLeft + "px";
-				};
-			} else {
-				document.body.appendChild(popup);
-				resizeEvt = function(){
-					var bodyRect = document.body.getBoundingClientRect(),
-						elemRect = superSel.getBoundingClientRect(),
-						offsetTop = (elemRect.top + 45) - bodyRect.top,
-						offsetLeft = elemRect.left - bodyRect.left;
-					popup.style.top = offsetTop + "px";
-					popup.style.left = offsetLeft + "px";
-				};
-			}
 			this.set('showDefault', (defaultExists && !(this.get("selection").length)));
 			if (this.get('showDefault')){
 				this.set('selection',[defval.value]);
@@ -422,20 +408,6 @@
 					this.set('showDefault', true);
 			}
 
-			this.set('open',false);
-			this.on('clickpopup',function(e){ e.original.stopPropagation(); });
-			this.on('open',function(e) {
-				e.original.stopPropagation();
-				e.original.preventDefault();
-				if(this.get("open")){
-					this.set('open', false);
-				}else{
-					this.set('open', true);
-					resizeEvt();
-					this.find('input.search-query').focus();
-				}
-				return false;
-			});
 			this.on('select',function(e,which){
 				var sels = this.get("selection"),
 					selopt = select.options[which],
@@ -467,11 +439,6 @@
 					this.set('open', false);
 				}
 				resizeEvt();
-			});
-			window.addEventListener("resize", function(){ if (r.get("open")) resizeEvt(); }, false);
-			window.addEventListener("click", function(){ r.set('open',false); }, false);
-			document.addEventListener("keyup", function(e) {
-				if (e.keyCode === 27) { r.set('open',false); }
 			});
 		}
 	});
