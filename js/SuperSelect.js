@@ -2,78 +2,85 @@
 	if(typeof window.EditorWidgets !== 'object'){
 		window.EditorWidgets = {};
 	}
-
-	function SuperSelect(){
-		var main = document.createElement('div'),
-			select = document.createElement('select'),
-			defOption = document.createElement('option'),
-			defaultText = "",
-			defaultDesc = "",
-			
-			showDefault = false,
-			options = [],
-			value = [],
-			multiple = false,
-			btnpos = "left";
+	/* text, btnpos, icon, multiple, target, options, value, name, id */
+	function SuperSelect(args){
+		var that = this, open = false,
+			leftbtn, rightbtn, btnpos,
+			parent, refnode, select, multiple,
+			options, tmpopts, value,
+			main = document.createElement('div'),
+			rightbtn = document.createElement('button'),
+			controls = document.createElement('div'),
+			badgeHolder = document.createElement('span'),
+			noSelection = document.createElement('span'),
+			popup = document.createElement('div'),
+			point = document.createElement('div'),
+			filterbox = document.createElement('input'),
+			filterdiv = document.createElement('div'),
+			optionList = document.createElement('div');
 		
 		main.style.display = "inline-block";
 		main.style.position = "relative";
-		
-		select.style.display = "none";
-		select.multiple = true;
-		select.appendChild(defOption);
+
+		if(args.target.nodeName === "SELECT"){
+			select = args.target;
+			parent = select.parentNode;
+			refnode = select.nextSibling;
+			multiple = select.multiple;
+		}else{
+			parent = args.target;
+			refnode = null;
+			multiple = !!args.multiple;
+		}
 
 		main.appendChild(select);
-	
-	<div style="display:inline-block;position:relative;">
 
-		<div class="superselect">
+		select.style.display = "none";
+		select.multiple = true;
+
+		controls.className = "superselect";
 		
-			{{#(button === "left")}}<div>
-				<button class="btn" on-tap="open"><i class="{{icon}}"></i> {{text}}</button>
-			</div>{{/button}}
+		leftbtn = constructButton(args.text, args.icon, this);
+		rightbtn = constructButton(args.text, args.icon, this);
 		
-			<span>
-				{{#options:i}}
-					{{#checkSelected(.value,selection)}}
-						<span class="badge badge-info pad-right-low">
-							{{.text}} {{#multiple}}<span style="color: white; cursor: pointer;" on-tap="select:{{i}}">×</span>{{/multiple}}
-						</span>
-					{{/checkSelected}}
-				{{/options}}
-			
-				{{#showDefault}}
-					<span class="badge badge-info pad-right-low">
-						{{defaultValue.text}}
-					</span>
-				{{/showDefault}}
-			
-				{{^selection.length}}<span>Nothing selected</span>{{/selection.length}}
-			
-			</span>\
-			
-			{{^(button === "left")}}<div>
-				<button class="btn" on-tap="open"><i class="{{icon}}"></i> {{text}}</button>
-			</div>{{/button}}
+		controls.appendChild(leftbtn);
 
-		</div>
-
-		<div class="superselectPopup {{(button === "left"?"left":"right")}}" style="display:{{open?"block":"none"}};" on-tap="clickpopup">\
-			<div class="point"></div>
-			<div class="point"></div>
-
-			<div>
-				<input type="text" class="search-query" value="{{filterstr}}"/>
-			</div>
-
-			<div class="optionListing">
-
-			</div>
-
-		</div>
-
-	</div>
+		noSelection.textContent = "Nothing selected";
+		badgeHolder.appendChild(noSelection);
+		controls.appendChild(badgeHolder);
 	
+		controls.appendChild(rightbtn);
+
+		main.appendChild(controls)
+
+		popup.className = "superselectPopup";
+		popup.classList.add(btnpos);
+		popup.style.display = "none";
+
+		point.className = "point";
+		popup.appendChild(point);
+		popup.appendChild(point.cloneNode());
+
+		filterbox.className = "search-query";
+		filterbox.type = "text";
+
+		filterbox.addEventListener('change',filterOptions,false);
+
+		filterdiv.appendChild(filterbox);
+		popup.appendChild(filterdiv);
+		
+		optionList.className = "optionListing";
+		popup.appendChild(optionList);
+
+		main.appendChild(popup);
+
+		main.addEventListener('click',function(e){
+			e.stopPropagation();
+			if(!e.target.dataset.hasOwnProperty('index')){ return; }
+			var i = +e.target.dataset.index;
+			
+		},false);
+
 		Object.defineProperties(this,{
 			name: {
 				get: function(){ return select.name; },
@@ -86,36 +93,79 @@
 			multiple: {
 				get: function(){ return multiple; },
 				set: function(b){
-					var old = multiple;
+					var that = this, old = multiple;
 					multiple = !!b;
-					if(old && !multiple){
-						value = value.slice(0,1);
-						[].forEach.call(select.options,function(o){
-							if(o.value !== value[0]){ o.selected = false; }
+					if(old && !multiple && value.length > 1){
+						value = [value[0]];
+						[].forEach.call(select.options,function(o, i){
+							if(o.value !== value[0]){ that.deselect(i); }
 						});
 					}
 				}
 			},
-			defaultValue: {
-				get: function(){ return defOption.value; },
-				set: function(v){ return defOption.value = v; }
+			open: {
+				get: function(){ return open; },
+				set: function(b){
+					open = !!b;
+					popup.style.display = open?"block":"none";
+					return open;
+				}
 			},
-			defaultText: {
-				get: function(){ return defaultText; },
-				set: function(v){ return defaultText = ""+v; }
+			btnpos: {
+				get: function(){ return btnpos; },
+				set: function(pos){
+					popup.classList.remove(btnpos);
+					if(pos === "right"){
+						btnpos = "right";
+						leftbtn.style.display = "none";
+						rightbtn.style.display = "block";
+					}else{
+						btnpos = "left";
+						leftbtn.style.display = "block";
+						rightbtn.style.display = "none";
+					}
+					popup.classList.add(btnpos);
+					return btnpos;
+				}
 			},
-			defaultDesc: {
-				get: function(){ return defaultDesc; },
-				set: function(v){ return defaultDesc = ""+v; }
+			select: {
+				value: function(i){
+					var o = options[i];
+					if(!o || o.selected){ return; }
+					o.selected = true;
+					o.opt.selected = true;
+					o.badge.display = "inline";
+					o.listing.classList.add("selected");
+					if(!multiple){
+						options.forEach(function(opt){
+							if(opt !== o && opt.selected){
+								opt.selected = false;
+								opt.opt.selected = false;
+								opt.badge.display = "none";
+								opt.listing.classList.remove("selected");
+							}
+						});
+					}
+					updateValue();
+				}
 			},
-			defaultOption: {
-				get: function(){ return {text: defaultText, desc: defaultDesc, value: defOption.value}; },
-				set: function(v){
-					v = v||{};
-					defaultText = ""+v.text;
-					defaultDesc = ""+v.desc;
-					defOption.value = v.value;
-					return this.defaultOption;
+			deselect: {
+				value: function(i){
+					var o = options[i];
+					if(!o || !o.selected){ return; }
+					o.selected = false;
+					o.opt.selected = false;
+					o.badge.display = "none";
+					o.listing.classList.remove("selected");
+					updateValue();
+				}
+			},
+			toggle: {
+				value: function(i){
+					var o = options[i];
+					if(!o){ return; }
+					if(o.selected){ this.deselect(i); }
+					else{ this.select(i); }
 				}
 			},
 			options: {
@@ -124,55 +174,59 @@
 						return {
 							text: o.text,
 							desc: o.desc,
-							value: o.value
+							value: o.value,
+							selected: o.selected
 						};
 					});
 				},
 				set: function(newopts){
-					options = [].map.call(newopts,function(o){
-						var badge = constructBadge(o.text,function(){}),
-							popup = constructPopup(o.text,o.desc,function(){}),
-							opt = document.createElement('option');
+					var max = multiple?1/0:1;
+					options = newopts.map(function(o,i){
+						var badge = constructBadge(o.text,i),
+							listing = constructlisting(o.text,o.desc,i),
+							opt = document.createElement('option'),
+							selected = max > 1 && o.selected !== false && (o.selected || value.indexOf(o.value) > -1);
 						
 						opt.value = o.value;
 						
-						if(value.indexOf(o.value) > -1){
+						if(selected){
 							opt.selected = true;
 							badge.display = "inline;";
-							popup.className = "option selected";
+							listing.className = "option selected";
+							max--;
 						}else{
 							opt.selected = false;
 							badge.display = "none";
-							popup.className = "option";
+							listing.className = "option";
 						}
 
 						return {
-							text: o.text,
-							desc: o.desc,
+							text: o.text||"",
+							desc: o.desc||"",
 							value: o.value,
+							selected: selected,
 							badge: badge,
-							popup: popup,
+							listing: listing,
 							opt: opt
 						};
 					});
 
-					value = value.filter(function(v){ return options.some(function(o){ return o.value == v; }); });
+					updateValue();
 
 					select.innerHTML = "";
 					badgeHolder.innerHTML = "";
-					popupHolder.innerHTML = "";
+					optionList.innerHTML = "";
 
-					//TODO: Deal with default badge
 					options.forEach(function(o){
 						select.appendChild(o.opt);
 						badgeHolder.appendChild(o.badge);
-						popupHolder.appendChild(o.popup);
+						optionList.appendChild(o.listing);
 					});
 				}
 			}
 			value: {
 				get: function(){
-					return value.length?value:[defOption.value];
+					return value.slice();
 				},
 				set: function(val){
 					if(!(val instanceof Array)){ val = [val]; }
@@ -181,38 +235,88 @@
 
 					if(!multiple){ val = val.slice(0,1); }
 
-					value = val;
-
 					options.forEach(function(o){
 						if(value.indexOf(o.opt.value) > -1){
 							o.opt.selected = true;
 							o.badge.style.display = "inline";
-							o.popup.classList.add("selected");
+							o.listing.classList.add("selected");
 						}else{
 							o.opt.selected = false;
 							o.badge.style.display = "none";
-							o.popup.classList.remove("selected");
+							o.listing.classList.remove("selected");
 						}
 					});
 
-					if(value.length === 0){
-						if(showDefault){
-							defOption.selected = true;
-							defaultBadge.style.display = "inline";
-						}else{
-							noSelection.style.display = "inline";
-						}
-					}else{
-						noSelection.style.display = "none";
-					}
+					updateValue();
+
 				}
 				
 			}
 		});
-		
+
+		this.btnpos = args.btnpos;
+
+		tmpopts = (args.options instanceof Array)?
+			args.options:
+			[].map.call(select.options,function(opt){
+				return {
+					text: opt.textContent,
+					desc: "",
+					value: opt.value,
+					selected: opt.selected
+				};
+			});
+
+		this.options = tmpopts;
+		this.value = args.value;
+
+		if(typeof args.id === "string"){ this.id = args.id; }
+		if(typeof args.name === "string"){ this.name = args.name; }
+
+		parent.insertBefore(main, refnode);
+
+		function updateValue(){
+			value = options
+						.filter(function(o){ return o.selected; })
+						.map(function(o){ return o.value; });
+
+			if(value.length === 0){
+				noSelection.style.display = "inline";
+			}else{
+				noSelection.style.display = "none";
+			}
+		}
+
+		function filterOptions(){
+			var filterstr = this.value.toLowerCase();
+			options.forEach(function(o){
+				o.listing.style.display = (
+					(o.text.toLowerCase().indexOf(filterstr) > -1) ||
+					(o.desc.toLowerCase().indexOf(filterstr) > -1)
+				)?"":"none";
+			});
+		}
 	}
 
-	function constructBadge(text,cb){
+	function constructButton(text, iconclass, ss){
+		var main = document.createElement('div'),
+			btn = document.createElement('button'),
+			icon = document.createElement('div');
+
+		icon.className = iconclass;
+		btn.appendChild(icon);
+		btn.appendChild(document.createTextNode(text));
+		main.appendChild(btn);
+
+		btn.addEventListener('click',function(e){
+			e.stopPropagation();
+			ss.open = !ss.open;
+		},false);
+
+		return main;
+	}
+
+	function constructBadge(text,i){
 		var badge = document.createElement('span'),
 			x = document.createElement('span');
 		
@@ -221,22 +325,27 @@
 		x.style.color = "white";
 		x.style.cursor = "pointer";
 	
-		x.addEventListener("click",cb,false);
+		x.dataset.index = i;
 	
 		badge.appendChild(document.createTextNode(text));
 		badge.appendChild(x);
 		return badge;
 	}
 
-	function constructPopup(text,desc,cb){
+	function constructlisting(text,desc,i){
 		var main = document.createElement('span'),
 			tcon = document.createElement('span'),
 			dcon = document.createElement('span'),
 			check = document.createElement('div');
 
 		main.style.clear = "both";
+		
 		tcon.style.textAlign = "left";
+		tcon.style.pointerEvents = "none";
+		
 		dcon.style.float = "right";
+		dcon.style.pointerEvents = "none";
+		
 		check.className = "check";
 		
 		tcon.appendChild(check);
@@ -247,7 +356,7 @@
 		main.appendChild(tcon);
 		main.appendChild(dcon);
 
-		main.addEventListener("click",cb,false);
+		main.dataset.index = i;
 		
 		return main;
 	}
