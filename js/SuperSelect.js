@@ -308,6 +308,7 @@
 		filterbox.type = "text";
 
 		filterbox.addEventListener('change',filterOptions,false);
+		filterbox.addEventListener('keyup',filterOptions,false);
 
 		filterdiv.appendChild(filterbox);
 		popup.appendChild(filterdiv);
@@ -418,12 +419,7 @@
 			x = document.createElement('span');
 
 		badge.className = "badge badge-info pad-right-low";
-
-		x.style.color = "white";
-		x.style.cursor = "pointer";
-
 		x.dataset.index = i;
-		x.textContent = "×";
 
 		badge.appendChild(document.createTextNode(text));
 		badge.appendChild(x);
@@ -465,7 +461,10 @@
 		Ractive.components.SuperSelect = Ractive.extend({
 			template: "<span></span>",
 			onrender(){
-				var ss = new SuperSelect({target: this.find('span')});
+				var ss = new SuperSelect({
+					target: this.find('span'),
+					modal: this.get("modal")
+				});
 				this.observe('options',function(opts){ ss.options = opts; });
 				this.observe('defaultOption',function(dopt){ ss.defaultOption = dopt; });
 				this.observe('multiple',function(m){ ss.multiple = m; });

@@ -25,6 +25,13 @@
     margin-right: 5px;
 }
 
+.superselect .badge span:before {
+	content: "×";
+	color: white;
+	cursor: pointer;
+	margin-left: 3px; 
+}
+
 .superselectPopup {
     position: absolute;
     width: 280px;
