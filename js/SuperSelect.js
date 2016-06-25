@@ -5,13 +5,13 @@
 
 	/*	text, btnpos, icon, multiple, target,
 		options, value, name, id, modal,
-		defaultOpt
+		defaultOption
 	*/
 	function SuperSelect(args){
 		var that = this, open = false,
-			leftbtn, rightbtn, btnpos, defOpt,
-			parent, refnode, select, multiple,
-			options, tmpopts, value, modal,
+			text, icon, leftbtn, rightbtn, btnpos,
+			target, parent, refnode, select, multiple,
+			options, defOpt, tmpopts, value, modal,
 			main = document.createElement('div'),
 			rightbtn = document.createElement('button'),
 			controls = document.createElement('div'),
@@ -33,6 +33,25 @@
 				get: function(){ return select.id; },
 				set: function(id){ return select.id = id; }
 			},
+			text: {
+				get: function(){ return text; },
+				set: function(t){
+					text = t?""+t:"Select";
+					var btn = leftbtn.childNodes[0];
+					btn.replaceChild(document.createTextNode(text),btn.childNodes[1]);
+					btn = rightbtn.childNodes[0];
+					btn.replaceChild(document.createTextNode(text),btn.childNodes[1]);
+				}
+			},
+			icon: {
+				get: function(){ return icon; },
+				set: function(i){
+					icon = ""+i;
+					leftbtn.childNodes[0].childNodes[0].className = icon;
+					rightbtn.childNodes[0].childNodes[0].className = icon;
+					return icon;
+				}
+			},
 			multiple: {
 				get: function(){ return multiple; },
 				set: function(b){
@@ -46,12 +65,12 @@
 					}
 				}
 			},
-			defaultOpt: {
+			defaultOption: {
 				get: function(){ return defOpt; },
 				set: function(newdef){
 					defOpt = typeof newdef === "object"?newdef:null;
-					defBadge.textContent = defOpt.text;
 					if(defOpt){
+						defBadge.textContent = defOpt.text;
 						noSelection.style.display = "none";
 						if(value.length === 0){
 							defBadge.style.display = "inline";
@@ -105,7 +124,7 @@
 
 					o.selected = true;
 					o.opt.selected = true;
-					o.badge.display = "inline";
+					o.badge.style.display = "inline";
 					o.listing.classList.add("selected");
 
 					if(!multiple){
@@ -113,7 +132,7 @@
 							if(opt !== o && opt.selected){
 								opt.selected = false;
 								opt.opt.selected = false;
-								opt.badge.display = "none";
+								opt.badge.style.display = "none";
 								opt.listing.classList.remove("selected");
 							}
 						});
@@ -128,7 +147,7 @@
 					if(!o || !o.selected){ return; }
 					o.selected = false;
 					o.opt.selected = false;
-					o.badge.display = "none";
+					o.badge.style.display = "none";
 					o.listing.classList.remove("selected");
 					updateValue();
 				}
@@ -164,12 +183,12 @@
 
 						if(selected){
 							opt.selected = true;
-							badge.display = "inline;";
+							badge.style.display = "inline;";
 							listing.className = "option selected";
 							max--;
 						}else{
 							opt.selected = false;
-							badge.display = "none";
+							badge.style.display = "none";
 							listing.className = "option";
 						}
 
@@ -189,6 +208,9 @@
 					select.innerHTML = "";
 					badgeHolder.innerHTML = "";
 					optionList.innerHTML = "";
+
+					badgeHolder.appendChild(defBadge);
+					badgeHolder.appendChild(noSelection);
 
 					options.forEach(function(o){
 						select.appendChild(o.opt);
@@ -229,13 +251,19 @@
 		main.style.display = "inline-block";
 		main.style.position = "relative";
 
-		if(args.target.nodeName === "SELECT"){
-			select = args.target;
+		target = (args.target||args.el);
+		target = target instanceof Node?
+			target:document.getElementById(target);
+		if(!target){ throw new Error("Missing DOM Insertion Point for SuperSelect"); }
+		if(target.nodeName === "SELECT"){
+			select = target;
 			parent = select.parentNode;
 			refnode = select.nextSibling;
 			multiple = select.multiple;
 		}else{
-			parent = args.target;
+			select = document.createElement('select');
+			select.multiple = true;
+			parent = target;
 			refnode = null;
 			multiple = !!args.multiple;
 		}
@@ -247,20 +275,17 @@
 
 		controls.className = "superselect";
 
-		leftbtn = constructButton(args.text, args.icon, this);
-		rightbtn = constructButton(args.text, args.icon, this);
+		leftbtn = constructButton(this);
+		rightbtn = constructButton(this);
 
 		this.btnpos = args.btnpos;
+		this.text = args.text;
+		this.icon = args.icon;
 
 		controls.appendChild(leftbtn);
 
 		defBadge.className = "badge badge-info pad-right-low";
 		noSelection.textContent = "Nothing selected";
-
-		badgeHolder.appendChild(defBadge);
-		badgeHolder.appendChild(noSelection);
-
-		this.defaultOpt = args.defaultOpt;
 
 		controls.appendChild(badgeHolder);
 
@@ -268,13 +293,7 @@
 
 		main.appendChild(controls)
 
-		main.addEventListener('click',function(e){
-			e.stopPropagation();
-			if(e.target.dataset.hasOwnProperty("index")){
-				that.select(+e.target.dataset.index);
-				if(!multiple){ that.open = false; }
-			}
-		},false);
+		main.addEventListener('click',selectHandler,false);
 
 
 		popup.className = "superselectPopup";
@@ -296,6 +315,8 @@
 		optionList.className = "optionListing";
 		popup.appendChild(optionList);
 
+		popup.addEventListener('click',selectHandler,false);
+
 		tmpopts = (args.options instanceof Array)?
 			args.options:
 			[].map.call(select.options,function(opt){
@@ -309,6 +330,7 @@
 
 		this.options = tmpopts;
 		this.value = args.value;
+		this.defaultOption = args.defaultOption;
 
 		if(typeof args.id === "string"){ this.id = args.id; }
 		if(typeof args.name === "string"){ this.name = args.name; }
@@ -353,6 +375,15 @@
 			});
 		}
 
+		function selectHandler(e){
+			e.stopPropagation();
+			e.preventDefault();
+			if(e.target.dataset.hasOwnProperty("index")){
+				that.toggle(+e.target.dataset.index);
+				if(!multiple){ that.open = false; }
+			}
+		}
+
 		function resize(){
 			var bodyRect = document.body.getBoundingClientRect(),
 				elemRect = (btnpos === "left"?leftbtn:rightbtn).getBoundingClientRect(),
@@ -363,15 +394,14 @@
 		}
 	}
 
-	function constructButton(text, iconclass, ss){
+	function constructButton(ss){
 		var main = document.createElement('div'),
 			btn = document.createElement('button'),
 			icon = document.createElement('div');
 
 		btn.className = "btn";
-		icon.className = iconclass;
 		btn.appendChild(icon);
-		btn.appendChild(document.createTextNode(text));
+		btn.appendChild(document.createTextNode("Select"));
 		main.appendChild(btn);
 
 		btn.addEventListener('click',function(e){
@@ -393,6 +423,7 @@
 		x.style.cursor = "pointer";
 
 		x.dataset.index = i;
+		x.textContent = "×";
 
 		badge.appendChild(document.createTextNode(text));
 		badge.appendChild(x);
@@ -400,7 +431,7 @@
 	}
 
 	function constructlisting(text,desc,i){
-		var main = document.createElement('span'),
+		var main = document.createElement('div'),
 			tcon = document.createElement('span'),
 			dcon = document.createElement('span'),
 			check = document.createElement('div');
@@ -418,7 +449,7 @@
 		tcon.appendChild(check);
 		tcon.appendChild(document.createTextNode(text));
 
-		dcon.appendChild(document.createTextNode(desc));
+		dcon.appendChild(document.createTextNode(desc||""));
 
 		main.appendChild(tcon);
 		main.appendChild(dcon);
@@ -436,9 +467,11 @@
 			onrender(){
 				var ss = new SuperSelect({target: this.find('span')});
 				this.observe('options',function(opts){ ss.options = opts; });
-				this.observe('defaultOpt',function(dopt){ ss.defaultOpt = dopt; });
+				this.observe('defaultOption',function(dopt){ ss.defaultOption = dopt; });
 				this.observe('multiple',function(m){ ss.multiple = m; });
 				this.observe('value',function(v){ ss.value = v; });
+				this.observe('text',function(t){ ss.text = t; });
+				this.observe('icon',function(i){ ss.icon = i; });
 			}
 		});
 	}

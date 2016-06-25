@@ -17,8 +17,12 @@
     display: inline-block;
 }
 
-.superselect > button {
+.superselect button {
     min-width: 100px;
+}
+
+.superselect button > div {
+    margin-right: 5px;
 }
 
 .superselectPopup {
