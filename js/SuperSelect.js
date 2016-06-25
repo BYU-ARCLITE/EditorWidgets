@@ -12,6 +12,7 @@
 			text, icon, leftbtn, rightbtn, btnpos,
 			target, parent, refnode, select, multiple,
 			options, defOpt, tmpopts, value, modal,
+			lastFilter = +(new Date),
 			main = document.createElement('div'),
 			rightbtn = document.createElement('button'),
 			controls = document.createElement('div'),
@@ -355,8 +356,8 @@
 
 		function updateValue(){
 			value = options
-						.filter(function(o){ return o.selected; })
-						.map(function(o){ return o.value; });
+					.filter(function(o){ return o.selected; })
+					.map(function(o){ return o.value; });
 
 			if(value.length === 0){
 				(defOpt?defBadge:noSelection).style.display = "inline";
@@ -367,13 +368,22 @@
 		}
 
 		function filterOptions(){
-			var filterstr = this.value.toLowerCase();
-			options.forEach(function(o){
-				o.listing.style.display = (
-					(o.text.toLowerCase().indexOf(filterstr) > -1) ||
-					(o.desc.toLowerCase().indexOf(filterstr) > -1)
-				)?"":"none";
-			});
+			var that = this,
+				time = +(new Date);
+			if(time <= lastFilter){ return; }
+			lastFilter = time + 100;
+			setTimeout(function(){
+				var filterstr = that.value.toLowerCase();
+				options.forEach(function(o){
+					var filtered =
+						(o.text.toLowerCase().indexOf(filterstr) > -1) ||
+						(o.desc.toLowerCase().indexOf(filterstr) > -1);
+					if(o.filtered !== filtered){
+						o.filtered = filtered;
+						o.listing.style.display = filtered?"block":"none";
+					}
+				});
+			},100);
 		}
 
 		function selectHandler(e){
