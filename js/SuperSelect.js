@@ -3,7 +3,7 @@
 		window.EditorWidgets = {};
 	}
 
-	/*	text, btnpos, icon, multiple, target,
+	/*	text, button, icon, multiple, target,
 		options, value, name, id, modal,
 		defaultOption
 	*/
@@ -25,51 +25,90 @@
 			filterdiv = document.createElement('div'),
 			optionList = document.createElement('div');
 
+		this.events = {};
 		Object.defineProperties(this,{
 			name: {
 				get: function(){ return select.name; },
-				set: function(n){ return select.name = n; }
+				set: function(n){
+					n = ""+n;
+					if(select.name !== n){
+						select.name = n;
+						this.emit("namechange");
+					}
+					return select.name;
+				}
 			},
 			id: {
 				get: function(){ return select.id; },
-				set: function(id){ return select.id = id; }
+				set: function(id){
+					id = ""+id;
+					if(select.id !== id){
+						select.id = id;
+						this.emit("idchange");
+					}
+					return select.id;
+				}
 			},
 			text: {
 				get: function(){ return text; },
 				set: function(t){
-					text = t?""+t:"Select";
-					var btn = leftbtn.childNodes[0];
+					var btn;
+
+					t = t?""+t:"Select";
+					if(text === t){ return t; }
+					text = t;
+					
+					btn = leftbtn.childNodes[0];
 					btn.replaceChild(document.createTextNode(text),btn.childNodes[1]);
 					btn = rightbtn.childNodes[0];
 					btn.replaceChild(document.createTextNode(text),btn.childNodes[1]);
+
+					this.emit("textchange");
+					return text;
 				}
 			},
 			icon: {
 				get: function(){ return icon; },
 				set: function(i){
-					icon = ""+i;
+					i = ""+i;
+					if(icon === i){ return i; }
+					icon = i;
+					
 					leftbtn.childNodes[0].childNodes[0].className = icon;
 					rightbtn.childNodes[0].childNodes[0].className = icon;
+
+					this.emit("iconchange");
 					return icon;
 				}
 			},
 			multiple: {
 				get: function(){ return multiple; },
 				set: function(b){
-					var that = this, old = multiple;
-					multiple = !!b;
-					if(old && !multiple && value.length > 1){
+					var that = this;
+
+					b = !!b;
+					if(multiple === b){ return b; }
+					multiple = b;
+
+					if(!multiple && value.length > 1){
 						value = [value[0]];
 						[].forEach.call(select.options,function(o, i){
 							if(o.value !== value[0]){ that.deselect(i); }
 						});
 					}
+
+					this.emit("multiplechange");
+					return multiple;
 				}
 			},
 			defaultOption: {
 				get: function(){ return defOpt; },
 				set: function(newdef){
-					defOpt = typeof newdef === "object"?newdef:null;
+
+					newdef = typeof newdef === "object"?newdef:null;
+					if(defOpt === newdef){ return defOpt; }
+					defOpt = newdef;
+
 					if(defOpt){
 						defBadge.textContent = defOpt.text;
 						noSelection.style.display = "none";
@@ -82,6 +121,8 @@
 							noSelection.style.display = "inline";
 						}
 					}
+
+					this.emit("defaultchange");
 					return defOpt;
 				}
 			},
@@ -89,8 +130,9 @@
 				get: function(){ return open; },
 				set: function(b){
 					b = !!b;
-					if(open === b){ return; }
+					if(open === b){ return open; }
 					open = b;
+
 					popup.style.display = open?"block":"none";
 
 					if(open){
@@ -98,12 +140,17 @@
 						filterbox.focus();
 					}
 
+					this.emit("openchange");
 					return open;
 				}
 			},
-			btnpos: {
+			button: {
 				get: function(){ return btnpos; },
 				set: function(pos){
+					pos = pos === "right"?pos:"left";
+					if(btnpos === pos){ return pos; }
+					btnpos = pos;
+
 					popup.classList.remove(btnpos);
 					if(pos === "right"){
 						btnpos = "right";
@@ -115,6 +162,8 @@
 						rightbtn.style.display = "none";
 					}
 					popup.classList.add(btnpos);
+
+					this.emit("buttonchange");
 					return btnpos;
 				}
 			},
@@ -218,6 +267,9 @@
 						badgeHolder.appendChild(o.badge);
 						optionList.appendChild(o.listing);
 					});
+
+					this.emit("optionschange");
+					return this.options;
 				}
 			},
 			value: {
@@ -245,6 +297,7 @@
 					});
 
 					updateValue();
+					return this.value;
 				}
 			}
 		});
@@ -279,7 +332,7 @@
 		leftbtn = constructButton(this);
 		rightbtn = constructButton(this);
 
-		this.btnpos = args.btnpos;
+		this.btnpos = args.button;
 		this.text = args.text;
 		this.icon = args.icon;
 
@@ -365,6 +418,7 @@
 				defBadge.style.display = "none";
 				noSelection.style.display = "none";
 			}
+			this.emit("valuechange");
 		}
 
 		function filterOptions(){
@@ -404,6 +458,27 @@
 			popup.style.left = offsetLeft + "px";
 		}
 	}
+
+	SuperSelect.prototype.emit = function(evt){
+		var that = this, fns = this.events[evt.type];
+		evt.target = this;
+		if(fns instanceof Array){ fns.forEach(function(cb){ try{cb.call(that,evt);}catch(ignore){} }); }
+		return !evt.defaultPrevented;
+	};
+
+	SuperSelect.prototype.addEventListener = function(name, cb){
+		name = name.toLowerCase();
+		if(this.events.hasOwnProperty(name)){ this.events[name].push(cb); }
+		else{ this.events[name] = [cb]; }
+	};
+
+	SuperSelect.prototype.removeEventListener = function(name, cb){
+		var i;
+		name = name.toLowerCase();
+		if(!this.events.hasOwnProperty(name)){ return; }
+		i = this.events[name].indexOf(cb);
+		if(~i){ this.events[name].splice(i,1); }
+	};
 
 	function constructButton(ss){
 		var main = document.createElement('div'),
@@ -474,13 +549,92 @@
 				var ss = new SuperSelect({
 					target: this.find('span'),
 					modal: this.get("modal")
+				}), setting = false, that = this;
+
+				//Ractive to SuperSelect bindings
+				this.observe('id',function(id){
+					setting = true;
+					ss.id = id;
+					setting = false;
 				});
-				this.observe('options',function(opts){ ss.options = opts; });
-				this.observe('defaultOption',function(dopt){ ss.defaultOption = dopt; });
-				this.observe('multiple',function(m){ ss.multiple = m; });
-				this.observe('value',function(v){ ss.value = v; });
-				this.observe('text',function(t){ ss.text = t; });
-				this.observe('icon',function(i){ ss.icon = i; });
+				this.observe('name',function(name){
+					setting = true;
+					ss.name = name;
+					setting = false;
+				});
+				this.observe('options',function(opts){
+					setting = true;
+					ss.options = opts;
+					setting = false;
+				});
+				this.observe('defaultOption',function(dopt){
+					setting = true;
+					ss.defaultOption = dopt;
+					setting = false;
+				});
+				this.observe('multiple',function(m){
+					setting = true;
+					ss.multiple = m;
+					setting = false;
+				});
+				this.observe('value',function(v){
+					setting = true;
+					ss.value = v;
+					setting = false;
+				});
+				this.observe('text',function(t){
+					setting = true;
+					ss.text = t;
+					setting = false;
+				});
+				this.observe('icon',function(i){
+					setting = true;
+					ss.icon = i;
+					setting = false;
+				});
+				this.observe('button',function(b){
+					setting = true;
+					ss.button = b;
+					setting = false;
+				});
+
+				//SuperSelect to Ractive bindings
+				ss.addEventLister('idchange',function(){
+					if(setting){ return; }
+					that.set("id",ss.id);
+				});
+				ss.addEventLister('name',change',function(){
+					if(setting){ return; }
+					that.set("name",ss.name);
+				});
+				ss.addEventLister('optionschange',function(){
+					if(setting){ return; }
+					that.set("options", ss.options);
+				});
+				ss.addEventLister('defaultchange',function(){
+					if(setting){ return; }
+					that.set("defaultOption", ss.defaultOption);
+				});
+				ss.addEventLister('multiplechange',function(){
+					if(setting){ return; }
+					that.set("multiple", ss.multiple);
+				});
+				ss.addEventLister('valuechange',function(){
+					if(setting){ return; }
+					that.set("value", ss.value);
+				});
+				ss.addEventLister('textchange',function(){
+					if(setting){ return; }
+					that.set("text", ss.text);
+				});
+				ss.addEventLister('iconchange',function(){
+					if(setting){ return; }
+					that.set("icon", ss.icon);
+				});
+				ss.addEventLister('buttonchange',function(){
+					if(setting){ return; }
+					that.set("button", ss.button);
+				});
 			}
 		});
 	}
